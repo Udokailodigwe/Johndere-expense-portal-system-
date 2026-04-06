@@ -1,0 +1,19 @@
+<svg width="400" height="300" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#F3F4F6"/>
+  
+  <!-- Error Icon -->
+  <circle cx="200" cy="120" r="60" fill="#EF4444" opacity="0.1"/>
+  <circle cx="200" cy="120" r="40" fill="#EF4444"/>
+  <path d="M185 105L215 135M215 105L185 135" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- John Deere Logo -->
+  <rect x="160" y="180" width="80" height="40" rx="8" fill="#196F3D"/>
+  <text x="200" y="205" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">JD</text>
+  
+  <!-- Decorative Elements -->
+  <circle cx="80" cy="60" r="20" fill="#10B981" opacity="0.2"/>
+  <circle cx="320" cy="80" r="15" fill="#F59E0B" opacity="0.3"/>
+  <circle cx="100" cy="220" r="12" fill="#3B82F6" opacity="0.2"/>
+</svg>
+

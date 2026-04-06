@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme support */
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Dark theme styles */
+html.dark {
+  @apply bg-gray-900 text-white;
+}
+
+html.dark body {
+  @apply bg-gray-900 text-white;
+}
+
+/* Light theme styles (default) */
+html.light {
+  @apply bg-white text-gray-900;
+}
+
+html.light body {
+  @apply bg-white text-gray-900;
+}
+
+/* Auto theme - follows system preference */
+html.auto {
+  @apply bg-white text-gray-900;
+}
+
+@media (prefers-color-scheme: dark) {
+  html.auto {
+    @apply bg-gray-900 text-white;
+  }
+
+  html.auto body {
+    @apply bg-gray-900 text-white;
+  }
+}
