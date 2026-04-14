@@ -257,3 +257,52 @@ export const expenseCreatedConfirmationTemplate = (employee, expense) => {
 </html>
   `;
 };
+
+/** Email sent when a user is registered with a one-time password. */
+export const welcomeTempPasswordEmail = ({
+  name,
+  tempPassword,
+  activateUrl,
+}) => {
+  const text = `Hello ${name},
+
+Your John Deere Expense Portal account was created.
+
+One-time password (use this on Activate account): ${tempPassword}
+
+Open ${activateUrl} to set your own password and activate your account.
+
+If you did not expect this email, you can ignore it.`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #367C2B; color: white; padding: 15px; text-align: center; }
+    .content { padding: 20px; background-color: #f9f9f9; }
+    .code { font-size: 1.25rem; font-weight: bold; letter-spacing: 0.05em; margin: 16px 0; padding: 12px; background: #fff; border: 1px solid #ddd; }
+    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h2>Welcome to the Expense Portal</h2></div>
+    <div class="content">
+      <p>Hello ${name},</p>
+      <p>Your account was created. Use this <strong>one-time password</strong> on the activate-account page, then choose your own password:</p>
+      <div class="code">${tempPassword}</div>
+      <p><a href="${activateUrl}" style="display: inline-block; background-color: #367C2B; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">Activate your account</a></p>
+    </div>
+    <div class="footer">
+      <p>John Deere Internal Expense Reimbursement Portal</p>
+      <p>This is an automated email. Please do not reply.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  return { text, html };
+};
