@@ -1,3 +1,5 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,7 +11,9 @@ import authRoutes from "./routes/auth.js";
 import connectDB from "./db/connectdb.js";
 import notFoundMiddleware from "./middleware/not-found.js";
 import errorHandlerMiddleware from "./middleware/error-handler.js";
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
@@ -25,7 +29,7 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: true,
-  })
+  }),
 );
 app.use(helmet());
 
@@ -45,7 +49,14 @@ app.use(errorHandlerMiddleware);
 const PORT = process.env.PORT || 5000;
 const start = async () => {
   try {
-    await connectDB(process.env.MONGO_URI);
+    const mongoUri = process.env.MONGO_URI?.trim();
+    if (!mongoUri) {
+      console.error(
+        "Set MONGO_URI in server/.env (copy from .env.example). Get a connection string from MongoDB Atlas → Database → Connect.",
+      );
+      process.exit(1);
+    }
+    await connectDB(mongoUri);
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (error) {
     console.log(error);
