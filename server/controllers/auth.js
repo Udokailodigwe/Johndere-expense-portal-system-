@@ -1,6 +1,18 @@
 import { StatusCodes } from "http-status-codes";
 import User from "../models/user.js";
 import { BadRequestError, UnauthenticatedError } from "../errors/index.js";
+import { sendEmail } from "../utils/sendEmail.js";
+import { welcomeTempPasswordEmail } from "../utils/emailTemplate.js";
+
+const isProduction = process.env.NODE_ENV === "production";
+/** SameSite=None requires Secure; browsers drop the cookie if Secure is false. Use lax on http (local dev). */
+const tokenCookieOptions = {
+  httpOnly: true,
+  maxAge: 24 * 60 * 60 * 1000,
+  path: "/",
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+};
 
 export const register = async (req, res) => {
   const { name, email } = req.body;
@@ -27,8 +39,31 @@ export const register = async (req, res) => {
     role,
   });
 
-  //todo: send temporal password to user email
-  console.log(`Temporal password for ${email} is: ${tempPassword}`);
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const activateUrl = `${baseUrl.replace(/\/$/, "")}/activate-account`;
+  const hasEmailCreds =
+    Boolean(process.env.EMAIL_USER?.trim()) &&
+    Boolean(process.env.EMAIL_PASSWORD?.trim());
+
+  if (hasEmailCreds) {
+    const { html, text } = welcomeTempPasswordEmail({
+      name: user.name,
+      tempPassword,
+      activateUrl,
+    });
+    const mailed = await sendEmail({
+      to: user.email,
+      subject: "Welcome — activate your Expense Portal account",
+      text,
+      html,
+    });
+    if (!mailed.success) {
+      console.error("Signup email failed:", mailed.error);
+      console.log(`Temporal password for ${email} is: ${tempPassword}`);
+    }
+  } else {
+    console.log(`Temporal password for ${email} is: ${tempPassword}`);
+  }
 
   return res.status(StatusCodes.CREATED).json({
     message: "User registered successfully",
@@ -68,13 +103,7 @@ export const login = async (req, res) => {
 
   const token = user.createJWT();
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
-    maxAge: 24 * 60 * 60 * 1000,
-    path: "/",
-  });
+  res.cookie("token", token, tokenCookieOptions);
 
   res.status(StatusCodes.CREATED).json({
     message: "Login successful",
@@ -96,12 +125,7 @@ export const getCurrentUser = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-  });
+  res.clearCookie("token", { ...tokenCookieOptions, maxAge: 0 });
 
   res.status(StatusCodes.OK).json({
     message: "Logged out successfully",
@@ -128,7 +152,7 @@ export const activateAccount = async (req, res) => {
   // Only allow password reset for inactive users (those with temp passwords)
   if (user.active) {
     throw new BadRequestError(
-      "Account is already activated. Use change password instead."
+      "Account is already activated. Use change password instead.",
     );
   }
 
