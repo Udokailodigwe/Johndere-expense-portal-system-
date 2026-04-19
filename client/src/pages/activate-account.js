@@ -83,7 +83,7 @@ const ActivateAccount = () => {
     navigate(
       `/activate-account?form=${
         !values.isRegistered ? "activate-account" : "login"
-      }`
+      }`,
     );
   };
 
@@ -107,7 +107,9 @@ const ActivateAccount = () => {
         <main>
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
             <h2 className="text-2xl mb-6 text-gray-800 font-semibold text-center">
-              {values.isRegistered ? "Activate Your Account" : "Welcome Back"}{" "}
+              {values.isRegistered
+                ? "Activate Your Account"
+                : "Welcome Back"}{" "}
             </h2>
 
             <form onSubmit={onSubmit} className="space-y-4">
@@ -172,8 +174,8 @@ const ActivateAccount = () => {
                     ? "Activating..."
                     : "Logging in..."
                   : values.isRegistered
-                  ? "Activate Account"
-                  : "Login"}
+                    ? "Activate Account"
+                    : "Login"}
               </button>
             </form>
 
