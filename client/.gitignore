@@ -25,3 +25,9 @@ yarn-error.log*
 
 worksheet
 secret
+
+# env files
+.env
+.env.*
+client/.env*
+server/.env*
