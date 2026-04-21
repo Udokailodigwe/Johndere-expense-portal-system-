@@ -18,14 +18,13 @@ const UserSchema = new mongoose.Schema({
     ],
     unique: true,
     lowercase: true,
-    minlength: [2, "Name must be at least 2 characters long"],
-    maxlength: [50, "Name cannot exceed 50 characters"],
     trim: true,
   },
   password: {
     type: String,
     minlength: [8, "Password must be at least 8 characters long"],
     required: true,
+    select: false, // 🔥 prevent returning password by default
   },
   role: { type: String, enum: ["employee", "manager"], default: "employee" },
   approvals: [
@@ -37,12 +36,15 @@ const UserSchema = new mongoose.Schema({
   active: { type: Boolean, default: false },
 });
 
-// Hash password before save if modified
+// 🔥 Explicit index (don’t rely on unique only)
+UserSchema.index({ email: 1 }, { unique: true });
+
+// 🔥 FIXED password hashing (no double hashing bug)
 UserSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    if (this.password.length < 8) return next();
-  }
-  this.password = await bcrypt.hash(this.password, 10);
+  if (!this.isModified("password")) return next();
+
+  const saltRounds = process.env.NODE_ENV === "production" ? 10 : 8;
+  this.password = await bcrypt.hash(this.password, saltRounds);
   next();
 });
 
@@ -52,11 +54,10 @@ UserSchema.methods.createJWT = function () {
     process.env.JWT_SECRET,
     {
       expiresIn: process.env.JWT_LIFETIME,
-    }
+    },
   );
 };
 
-// Instance method to compare passwords
 UserSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };

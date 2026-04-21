@@ -41,13 +41,6 @@ const expenseSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
-    // attachments: [
-    //   {
-    //     filename: String,
-    //     url: String,
-    //     uploadedAt: { type: Date, default: Date.now },
-    //   },
-    // ],
     notes: {
       type: String,
       maxlength: [1000, "Notes cannot exceed 1000 characters"],
@@ -62,14 +55,15 @@ const expenseSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt
-  }
+    timestamps: true,
+  },
 );
 
-// Index for better query performance
 expenseSchema.index({ userId: 1, status: 1 });
 expenseSchema.index({ expenseDate: -1 });
 expenseSchema.index({ category: 1 });
+
+expenseSchema.index({ userId: 1, isDeleted: 1 });
 
 const Expense = mongoose.model("Expense", expenseSchema);
 export default Expense;

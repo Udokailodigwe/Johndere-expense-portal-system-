@@ -11,13 +11,23 @@ const approvalSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  status: { type: String, enum: ["approved", "rejected"], required: true },
-  date: { type: Date, default: Date.now },
+  status: {
+    type: String,
+    enum: ["approved", "rejected"],
+    required: true,
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
   rejectReason: {
     type: String,
     maxlength: [200, "Rejection reason cannot exceed 200 characters"],
   },
 });
+
+approvalSchema.index({ expenseId: 1 });
+approvalSchema.index({ managerId: 1 });
 
 const Approval = mongoose.model("Approval", approvalSchema);
 export default Approval;

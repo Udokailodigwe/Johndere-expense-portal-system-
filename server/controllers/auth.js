@@ -5,7 +5,7 @@ import { sendEmail } from "../utils/sendEmail.js";
 import { welcomeTempPasswordEmail } from "../utils/emailTemplate.js";
 
 const isProduction = process.env.NODE_ENV === "production";
-/** SameSite=None requires Secure; browsers drop the cookie if Secure is false. Use lax on http (local dev). */
+
 const tokenCookieOptions = {
   httpOnly: true,
   maxAge: 24 * 60 * 60 * 1000,
@@ -14,36 +14,39 @@ const tokenCookieOptions = {
   sameSite: isProduction ? "none" : "lax",
 };
 
+const normalizeEmail = (email) => String(email).toLowerCase().trim();
+
 export const register = async (req, res) => {
   const { name, email } = req.body;
-  const tempPassword = Math.random().toString(36).slice(-8);
 
   if (!name || !email) {
     throw new BadRequestError("name and email are required");
   }
 
-  // Check if email is already registered
-  const existingUser = await User.findOne({
-    email: String(email).toLowerCase().trim(),
-  });
-  if (existingUser) {
-    throw new BadRequestError("Email already registered");
-  }
-
+  const normalizedEmail = normalizeEmail(email);
+  const tempPassword = Math.random().toString(36).slice(-8);
   const role = req.isManagerRoute ? "manager" : "employee";
 
-  const user = await User.create({
-    name,
-    email,
-    password: tempPassword,
-    role,
-  });
+  let user;
+
+  try {
+    user = await User.create({
+      name,
+      email: normalizedEmail,
+      password: tempPassword,
+      role,
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      throw new BadRequestError("Email already registered");
+    }
+    throw err;
+  }
 
   const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const activateUrl = `${baseUrl.replace(/\/$/, "")}/activate-account`;
-  const hasEmailCreds =
-    Boolean(process.env.EMAIL_USER?.trim()) &&
-    Boolean(process.env.EMAIL_PASSWORD?.trim());
+
+  const hasEmailCreds = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD;
 
   if (hasEmailCreds) {
     const { html, text } = welcomeTempPasswordEmail({
@@ -51,18 +54,17 @@ export const register = async (req, res) => {
       tempPassword,
       activateUrl,
     });
-    const mailed = await sendEmail({
+
+    sendEmail({
       to: user.email,
-      subject: "Welcome — activate your Expense Portal account",
+      subject: "Activate your account",
       text,
       html,
+    }).catch((err) => {
+      console.error("Email failed:", err);
     });
-    if (!mailed.success) {
-      console.error("Signup email failed:", mailed.error);
-      console.log(`Temporal password for ${email} is: ${tempPassword}`);
-    }
   } else {
-    console.log(`Temporal password for ${email} is: ${tempPassword}`);
+    console.log(`Temp password for ${email}: ${tempPassword}`);
   }
 
   return res.status(StatusCodes.CREATED).json({
@@ -74,30 +76,33 @@ export const register = async (req, res) => {
       role: user.role,
       active: user.active,
     },
-    tempPassword: tempPassword,
+    tempPassword,
   });
 };
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
+
   if (!email || !password) {
-    throw new BadRequestError("Please provide required credentials");
+    throw new BadRequestError("Please provide credentials");
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({
+    email: normalizeEmail(email),
+  }).select("+password");
+
   if (!user) {
-    throw new UnauthenticatedError("User not found");
+    throw new UnauthenticatedError("Invalid credentials");
   }
 
   const isPasswordCorrect = await user.comparePassword(password);
   if (!isPasswordCorrect) {
-    throw new UnauthenticatedError("Password is incorrect");
+    throw new UnauthenticatedError("Invalid credentials");
   }
 
   if (!user.active) {
-    return res.status(403).json({
-      message:
-        "You must set your personal password before login. Use activate-account link to set your password",
+    return res.status(StatusCodes.FORBIDDEN).json({
+      message: "Activate your account before login",
     });
   }
 
@@ -105,64 +110,60 @@ export const login = async (req, res) => {
 
   res.cookie("token", token, tokenCookieOptions);
 
-  res.status(StatusCodes.CREATED).json({
+  return res.status(StatusCodes.OK).json({
     message: "Login successful",
   });
 };
 
 export const getCurrentUser = async (req, res) => {
-  const user = req.user;
+  const { name, email, role, active, approvals } = req.user;
 
-  res.status(StatusCodes.OK).json({
-    user: {
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      active: user.active,
-      approvals: user.approvals,
-    },
+  return res.status(StatusCodes.OK).json({
+    user: { name, email, role, active, approvals },
   });
 };
 
 export const logout = async (req, res) => {
   res.clearCookie("token", { ...tokenCookieOptions, maxAge: 0 });
 
-  res.status(StatusCodes.OK).json({
+  return res.status(StatusCodes.OK).json({
     message: "Logged out successfully",
   });
 };
 
 export const activateAccount = async (req, res) => {
   const { email, code, password } = req.body;
+
   if (!email || !code || !password) {
-    throw new BadRequestError("Please provide required credentials");
+    throw new BadRequestError("Missing required fields");
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({
+    email: normalizeEmail(email),
+  }).select("+password");
+
   if (!user) {
     throw new UnauthenticatedError("User not found");
   }
 
-  // Verify the current password (temporary password)
-  const isCodeCorrect = await user.comparePassword(code);
-  if (!isCodeCorrect) {
-    throw new UnauthenticatedError("Invalid one-time password");
+  if (user.active) {
+    throw new BadRequestError("Account already activated");
   }
 
-  // Only allow password reset for inactive users (those with temp passwords)
-  if (user.active) {
-    throw new BadRequestError(
-      "Account is already activated. Use change password instead.",
-    );
+  const isCodeCorrect = await user.comparePassword(code);
+  if (!isCodeCorrect) {
+    throw new UnauthenticatedError("Invalid activation code");
   }
 
   user.password = password;
   user.active = true;
+
   await user.save();
+
   const token = user.createJWT();
 
   return res.status(StatusCodes.OK).json({
-    message: "Password updated, account activated",
+    message: "Account activated",
     user: {
       name: user.name,
       email: user.email,
