@@ -55,11 +55,18 @@ const ActivateAccount = () => {
         return;
       }
 
-      dispatch(activateAccount({ email, code, password }));
-      setTimeout(() => {
+      try {
+        await dispatch(activateAccount({ email, code, password })).unwrap();
         dispatch(clearTempUser());
         navigate("/activate-account?form=login");
-      }, 2000);
+      } catch (error) {
+        const errorMessage = String(error || "").toLowerCase();
+        if (errorMessage.includes("invalid one-time password")) {
+          toast.error("Code not valid");
+          return;
+        }
+        toast.error(error || "Activation failed");
+      }
     } else {
       if (!email || !password) {
         toast.error("Please fill in all fields");

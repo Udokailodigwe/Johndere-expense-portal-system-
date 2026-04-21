@@ -19,21 +19,21 @@ export const registerEmployee = createAsyncThunk(
   "user/registerEmployee",
   async (user, thunkAPI) => {
     return await registerEmployeeThunk("/auth/register", user, thunkAPI);
-  }
+  },
 );
 
 export const registerManager = createAsyncThunk(
   "user/registerManager",
   async (user, thunkAPI) => {
     return registerManagerThunk("/auth/register/manager", user, thunkAPI);
-  }
+  },
 );
 
 export const activateAccount = createAsyncThunk(
   "user/activateAccount",
   async (user, thunkAPI) => {
     return activateAccountThunk("/auth/activate-account", user, thunkAPI);
-  }
+  },
 );
 
 export const login = createAsyncThunk("user/login", async (user, thunkAPI) => {
@@ -44,7 +44,7 @@ export const getCurrentUser = createAsyncThunk(
   "user/getCurrentUser",
   async (_, thunkAPI) => {
     return getCurrentUserThunk("/auth/me", thunkAPI);
-  }
+  },
 );
 
 export const logout = createAsyncThunk("user/logout", async (_, thunkAPI) => {
@@ -110,8 +110,7 @@ const userSlice = createSlice({
       })
       .addCase(activateAccount.rejected, (state, { payload }) => {
         state.isLoading = false;
-        state.error = payload.message;
-        toast.error(payload.message);
+        state.error = payload || "Activation failed";
       });
 
     //login
