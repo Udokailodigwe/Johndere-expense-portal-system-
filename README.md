@@ -10,7 +10,7 @@ Side-by-side terminal captures from the **commented** vs **active** script block
   <tr valign="top">
     <td width="50%">
       <strong>Commented — login every iteration</strong><br/>
-      <img src="./docs/load-tests/k6-auth-every-iteration-threshold-fail.png" alt="k6: login each iteration, threshold fail" width="100%"/>
+      <img src="docs/load-tests/k6-auth-every-iteration-threshold-fail.png" alt="k6: login each iteration, threshold fail" width="100%"/>
       <ul>
         <li>Each iteration: <code>POST /api/v1/auth/login</code> then <code>GET /api/v1/auth/me</code>.</li>
         <li>Stresses auth (bcrypt, JWT, DB) every loop.</li>
@@ -19,7 +19,7 @@ Side-by-side terminal captures from the **commented** vs **active** script block
     </td>
     <td width="50%">
       <strong>Active — login once per VU</strong><br/>
-      <img src="./docs/load-tests/k6-session-reuse-pass.png" alt="k6: reuse token cookie per VU" width="100%"/>
+      <img src="docs/load-tests/k6-session-reuse-pass.png" alt="k6: reuse token cookie per VU" width="100%"/>
       <ul>
         <li>Per-VU <code>token</code> from <code>Set-Cookie</code>; later calls use <code>Cookie: token=…</code>.</li>
         <li>Closer to a real browser session (sign in once).</li>
