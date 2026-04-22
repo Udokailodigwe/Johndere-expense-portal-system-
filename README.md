@@ -50,16 +50,17 @@ k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-
       </ul>
 
 ```js
-// ❌ slow — blocks response until emails finish
+// slow — blocks response until emails finish
 await sendEmail(employeePayload);
 await sendEmail(managerPayload);
 res.status(201).json({ message: "Expense submitted", expense });
 
-// ❌ sequential DB reads
+// sequential DB reads
 const employee = await User.findById(req.user.userId);
 const manager = await User.findOne({ role: "manager" });
 
-// ❌ nothing escapes the request — user waits for all of it
+//  nothing escapes the request — user waits for all of it
+// slow — blocks response until emails finish
 const expense  = await Expense.create(data);
 const employee = await User.findById(req.user.userId);
 const manager  = await User.findOne({ role: "manager" });
@@ -88,7 +89,7 @@ setImmediate(() => {
   sendEmail(managerPayload);
 });
 
-// ✅ parallel DB reads
+//  parallel DB reads
 const [employee, manager] = await Promise.all([
   User.findById(req.user.userId).select("name email"),
   User.findOne({ role: "manager" }).select("name email"),
