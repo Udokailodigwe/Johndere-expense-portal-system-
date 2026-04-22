@@ -2,7 +2,7 @@
 
 React SPA, Express API, optional Docker/nginx. Load tests live in `load-tests/`.
 
-## k6 (`load-tests/testscript.js`) — two scenarios
+## (`load-tests/testscript-expense-auth.js`) — two scenarios
 
 Side-by-side terminal captures from the **commented** vs **active** script blocks in the same file.
 
@@ -32,7 +32,77 @@ Side-by-side terminal captures from the **commented** vs **active** script block
 Server: `login` sets httpOnly `token` — `server/controllers/auth.js`.
 
 ```powershell
-k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-tests/testscript.js
+k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-tests/testscript-expense-auth.js
 ```
 
-Other scripts: `testscript-expense-create.js`, `testscript-expense-approve.js`.
+## (`load-tests/testscript-expense-create.js`) — two scenarios
+
+<table>
+  <tr valign="top">
+    <td width="50%">
+      <strong>Commented — blocking email + sequential DB reads</strong><br/>
+      <img src="docs/load-tests/k6-expense-create-threshold-fail.png" alt="k6: blocking email, threshold fail" width="100%"/>
+      <ul>
+        <li>Each request: <code>POST /api/v1/expenses</code> blocks until both <code>sendEmail()</code> calls resolve.</li>
+        <li>Sequential DB reads stall the request chain further.</li>
+        <li>Result: ~10s latency spikes, 29% failure rate, thresholds fail.</li>
+        <li>No async offloading — every operation blocks inside the request lifecycle until fully resolved.</li>
+      </ul>
+
+```js
+// ❌ slow — blocks response until emails finish
+await sendEmail(employeePayload);
+await sendEmail(managerPayload);
+res.status(201).json({ message: "Expense submitted", expense });
+
+// ❌ sequential DB reads
+const employee = await User.findById(req.user.userId);
+const manager = await User.findOne({ role: "manager" });
+
+// ❌ nothing escapes the request — user waits for all of it
+const expense  = await Expense.create(data);
+const employee = await User.findById(req.user.userId);
+const manager  = await User.findOne({ role: "manager" });
+await sendEmail(employeePayload);   // still waiting...
+await sendEmail(managerPayload);    // still waiting...
+res.status(201).json({ ... });      // user finally gets a response
+```
+
+</td>
+    <td width="50%">
+      <strong>Active — fire-and-forget email + parallel DB reads</strong><br/>
+      <img src="docs/load-tests/k6-expense-create-pass.png" alt="k6: async email, thresholds pass" width="100%"/>
+      <ul>
+        <li>Response sent immediately after DB write; emails offloaded via <code>setImmediate</code>.</li>
+        <li>DB reads parallelised with <code>Promise.all</code>.</li>
+        <li>Result: latency drops sharply, 0% failures, all thresholds pass.</li>
+        <li>Emails wrapped in <code>setImmediate</code> with full async error handling — completely outside the request lifecycle.</li>
+      </ul>
+
+```js
+//  respond first, email in background
+//  fire-and-forget with proper async/error handling
+res.status(201).json({ message: "Expense submitted", expense });
+setImmediate(() => {
+  sendEmail(employeePayload);
+  sendEmail(managerPayload);
+});
+
+// ✅ parallel DB reads
+const [employee, manager] = await Promise.all([
+  User.findById(req.user.userId).select("name email"),
+  User.findOne({ role: "manager" }).select("name email"),
+]);
+```
+
+</td>
+  </tr>
+</table>
+
+Server: `createExpense` lives in `server/controllers/expense.js`.
+
+```powershell
+k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-tests/testscript-expense-create.js
+```
+
+Other scripts: `testscript-expense-approve.js`.
