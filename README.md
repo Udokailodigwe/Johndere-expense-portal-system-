@@ -106,4 +106,62 @@ Server: `createExpense` lives in `server/controllers/expense.js`.
 k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-tests/testscript-expense-create.js
 ```
 
-Other scripts: `testscript-expense-approve.js`.
+## (`load-tests/testscript-expense-approve.js`) — two scenarios
+
+<table>
+  <tr valign="top">
+    <td width="50%">
+      <strong>Commented — sequential DB reads + race condition</strong><br/>
+      <img src="docs/load-tests/k6-Approval-failed.png" alt="k6: approval, race condition fail" width="100%"/>
+      <ul>
+        <li>Two separate DB operations create a race window — another request can modify the expense between reads.</li>
+        <li>Sequential DB reads stall the request chain.</li>
+        <li>Blocking email I/O inside the request lifecycle adds tail latency.</li>
+        <li>Result: 0.33% failure rate, 10s max latency spike, <code>approve success or race</code> check fails.</li>
+      </ul>
+
+```js
+//  two round trips — race window between them
+const expense = await Expense.findById(id);
+if (expense.status !== "pending") {
+  throw new BadRequestError(...);
+}
+const updatedExpense = await Expense.findByIdAndUpdate(
+  id,
+  { status },
+  { new: true }
+);
+```
+
+</td>
+    <td width="50%">
+      <strong>Active — atomic DB operation, no race</strong><br/>
+      <img src="docs/load-tests/k6-Approval-success.png" alt="k6: approval, thresholds pass" width="100%"/>
+      <ul>
+        <li>Single atomic <code>findOneAndUpdate</code> with condition — no race window possible.</li>
+        <li>Eliminates the ~0.33% concurrent approval failures seen under load.</li>
+        <li>Removes long tail latency spikes; p(95) drops from 376ms to 169ms.</li>
+        <li>Result: 0.00% failures, 100% checks passed, all thresholds pass.</li>
+      </ul>
+
+```js
+// atomic — condition + update in one DB round trip
+const updatedExpense = await Expense.findOneAndUpdate(
+  { _id: id, status: "pending" }, // atomic condition
+  { $set: { status } },
+  { new: true },
+);
+if (!updatedExpense) {
+  throw new BadRequestError("Expense already processed or not found");
+}
+```
+
+</td>
+  </tr>
+</table>
+
+Server: `approveExpense` lives in `server/controllers/expense.js`.
+
+```powershell
+k6 run -e BASE_URL=http://localhost -e TEST_EMAIL=... -e TEST_PASSWORD=... load-tests/testscript-expense-approve.js
+```
