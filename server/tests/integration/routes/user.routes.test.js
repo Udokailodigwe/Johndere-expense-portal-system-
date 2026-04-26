@@ -86,11 +86,11 @@ describe("User/Auth API Integration Tests", () => {
       const response = await request(app)
         .post("/api/v1/auth/login")
         .send(loginData)
-        .expect(201); // Login returns 201, not 200
+        .expect(200);
 
-      expect(response.body.user.email).toBe(loginData.email);
-      expect(response.body.user.active).toBe(true);
-      expect(response.body.user.token).toBeDefined();
+      expect(response.body.message).toBe("Login successful");
+
+      expect(response.headers["set-cookie"][0]).toContain("HttpOnly");
     });
 
     it("should reject login with invalid email", async () => {
