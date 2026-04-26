@@ -24,7 +24,7 @@ const UserSchema = new mongoose.Schema({
     type: String,
     minlength: [8, "Password must be at least 8 characters long"],
     required: true,
-    select: false, // 🔥 prevent returning password by default
+    select: false, // prevent returning password by default
   },
   role: { type: String, enum: ["employee", "manager"], default: "employee" },
   approvals: [
@@ -36,10 +36,7 @@ const UserSchema = new mongoose.Schema({
   active: { type: Boolean, default: false },
 });
 
-// 🔥 Explicit index (don’t rely on unique only)
-UserSchema.index({ email: 1 }, { unique: true });
-
-// 🔥 FIXED password hashing (no double hashing bug)
+// FIXED password hashing (no double hashing bug)
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 

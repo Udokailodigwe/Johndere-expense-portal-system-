@@ -9,35 +9,74 @@ import {
   expenseCreatedConfirmationTemplate,
 } from "../utils/emailTemplate.js";
 
+// export const createExpense = async (req, res) => {
+//   req.body.userId = req.user.userId;
+//   const expense = await Expense.create(req.body);
+
+//   const employee = await User.findById(req.user.userId).select("name email");
+//   const manager = await User.findOne({ role: "manager" }).select("name email");
+
+//   try {
+//     await sendEmail({
+//       to: employee.email,
+//       subject: "Expense Submitted Successfully",
+//       html: expenseCreatedConfirmationTemplate(employee, expense),
+//     });
+
+//     if (manager) {
+//       await sendEmail({
+//         to: manager.email,
+//         subject: `New Expense Submission from ${employee.name}`,
+//         html: expenseSubmittedTemplate(manager, employee, expense),
+//       });
+//     }
+//   } catch (error) {
+//     console.log("Email notification failed:", error);
+//   }
+
+//   res.status(StatusCodes.CREATED).json({
+//     message: "Expense submitted successfully",
+//     expense,
+//   });
+// };
+
 export const createExpense = async (req, res) => {
   req.body.userId = req.user.userId;
+
   const expense = await Expense.create(req.body);
 
-  const employee = await User.findById(req.user.userId).select("name email");
-  const manager = await User.findOne({ role: "manager" }).select("name email");
-
-  try {
-    await sendEmail({
-      to: employee.email,
-      subject: "Expense Submitted Successfully",
-      html: expenseCreatedConfirmationTemplate(employee, expense),
-    });
-
-    if (manager) {
-      await sendEmail({
-        to: manager.email,
-        subject: `New Expense Submission from ${employee.name}`,
-        html: expenseSubmittedTemplate(manager, employee, expense),
-      });
-    }
-  } catch (error) {
-    console.log("Email notification failed:", error);
-  }
+  const [employee, manager] = await Promise.all([
+    User.findById(req.user.userId).select("name email"),
+    User.findOne({ role: "manager" }).select("name email"),
+  ]);
 
   res.status(StatusCodes.CREATED).json({
     message: "Expense submitted successfully",
     expense,
   });
+
+  // async side effects (non-blocking)
+  if (process.env.NODE_ENV !== "test") {
+    setImmediate(async () => {
+      try {
+        await sendEmail({
+          to: employee.email,
+          subject: "Expense Submitted Successfully",
+          html: expenseCreatedConfirmationTemplate(employee, expense),
+        });
+
+        if (manager) {
+          await sendEmail({
+            to: manager.email,
+            subject: `New Expense Submission from ${employee.name}`,
+            html: expenseSubmittedTemplate(manager, employee, expense),
+          });
+        }
+      } catch (error) {
+        console.log("Email notification failed:", error);
+      }
+    });
+  }
 };
 
 export const getExpenses = async (req, res) => {
@@ -73,7 +112,7 @@ export const getExpenses = async (req, res) => {
   const [expenses, totalExpenses] = await Promise.all([
     Expense.find(query)
       .populate("userId", "name email")
-      .sort({ expenseDate: -1 })
+      .sort({ createdAt: -1, expenseDate: -1 })
       .skip(skip)
       .limit(parseInt(limit)),
     Expense.countDocuments(query),
@@ -133,7 +172,7 @@ export const getAllEmployeeExpenses = async (req, res) => {
   const [expenses, totalExpenses] = await Promise.all([
     Expense.find(query)
       .populate("userId", "name email")
-      .sort({ expenseDate: -1 })
+      .sort({ createdAt: -1, expenseDate: -1 })
       .skip(skip)
       .limit(parseInt(limit)),
     Expense.countDocuments(query),
@@ -224,7 +263,7 @@ export const deleteExpense = async (req, res) => {
       isDeleted: true,
       deletedAt: new Date(),
     },
-    { new: true }
+    { new: true },
   );
 
   if (!expense) {
